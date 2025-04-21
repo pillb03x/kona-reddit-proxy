@@ -1,62 +1,86 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
-
 const app = express();
 app.use(cors());
 
+const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID;
+const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
+
+let accessToken = null;
+let tokenExpiry = 0;
+
+// 🔐 Get OAuth2 Token
+async function getAccessToken() {
+  const now = Date.now();
+  if (accessToken && now < tokenExpiry) return accessToken;
+
+  const creds = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64');
+  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${creds}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'grant_type=client_credentials'
+  });
+
+  const data = await res.json();
+  accessToken = data.access_token;
+  tokenExpiry = now + (data.expires_in * 1000) - 60000; // refresh 1 min early
+  return accessToken;
+}
+
 const REDDIT_SUBS = [
-  'pennystocks',
-  'RobinHoodPennyStocks',
-  'Shortsqueeze',
-  'smallstreetbets',
-  'SPACs',
-  'Spacstocks',
-  'SqueezePlays',
-  'WebullPennyStocks'
+  'pennystocks', 'RobinHoodPennyStocks', 'Shortsqueeze',
+  'smallstreetbets', 'SPACs', 'Spacstocks',
+  'SqueezePlays', 'WebullPennyStocks'
 ];
 
-// Helper to simulate browser headers
-const headers = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-};
-
+// 🧠 Multi-subreddit fetch
 app.get('/reddit', async (req, res) => {
-  const { subreddit } = req.query;
+  const token = await getAccessToken();
+  const results = [];
 
-  // 🧪 If a specific subreddit is requested
-  if (subreddit) {
+  await Promise.all(REDDIT_SUBS.map(async sr => {
     try {
-      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=day&limit=100`, { headers });
-      const data = await response.json();
-      return res.json(data);
+      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
+      const r = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'kona-dashboard/1.0'
+        }
+      });
+      const json = await r.json();
+      results.push(...(json.data?.children || []));
     } catch (err) {
-      console.error(`❌ Error fetching /r/${subreddit}:`, err.message);
-      return res.status(500).json({ error: `Failed to fetch subreddit /r/${subreddit}` });
+      console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
     }
-  }
+  }));
 
-  // 🌊 If no subreddit specified, fetch all from your list
+  res.json({ data: { children: results } });
+});
+
+// 🧪 Single subreddit support
+app.get('/reddit/:sub', async (req, res) => {
+  const token = await getAccessToken();
+  const { sub } = req.params;
   try {
-    const results = [];
-
-    await Promise.all(REDDIT_SUBS.map(async (sr) => {
-      try {
-        const response = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=day&limit=50`, { headers });
-        const json = await response.json();
-        results.push(...(json.data?.children || []));
-        console.log(`✅ Fetched /r/${sr} (${(json.data?.children || []).length} posts)`);
-      } catch (err) {
-        console.warn(`⚠️ Failed to fetch /r/${sr}:`, err.message);
+    const url = `https://oauth.reddit.com/r/${sub}/top?t=day&limit=25`;
+    const r = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'kona-dashboard/1.0'
       }
-    }));
-
-    res.json({ data: { children: results } });
+    });
+    const json = await r.json();
+    res.json(json);
   } catch (err) {
-    console.error('❌ Unexpected error fetching multiple subreddits:', err.message);
-    res.status(500).json({ error: 'Failed to fetch multiple subreddits' });
+    console.error(`❌ Error fetching /r/${sub}: ${err.message}`);
+    res.status(500).json({ error: `Failed to fetch /r/${sub}` });
   }
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🚀 Reddit proxy running on port ${port}`));
+app.listen(port, () => console.log(`🚀 Reddit OAuth proxy live on port ${port}`));
+

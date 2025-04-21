@@ -19,7 +19,7 @@ const REDDIT_SUBS = [
 app.get('/reddit', async (req, res) => {
   const { subreddit } = req.query;
 
-  // If a specific subreddit is requested:
+  // Fetch specific subreddit
   if (subreddit) {
     try {
       const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=hour&limit=100`);
@@ -31,18 +31,23 @@ app.get('/reddit', async (req, res) => {
     }
   }
 
-  // Otherwise fetch from ALL subreddits in the list
+  // Fetch all subreddits in parallel with error tolerance
   try {
     const results = [];
-    for (let sr of REDDIT_SUBS) {
-      const resSR = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=hour&limit=50`);
-      const json = await resSR.json();
-      results.push(...(json.data?.children || []));
-    }
+
+    await Promise.all(REDDIT_SUBS.map(async (sr) => {
+      try {
+        const resSR = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=hour&limit=50`);
+        const json = await resSR.json();
+        results.push(...(json.data?.children || []));
+      } catch (err) {
+        console.warn(`⚠️ Failed to fetch /r/${sr}:`, err.message);
+      }
+    }));
 
     res.json({ data: { children: results } });
   } catch (err) {
-    console.error('❌ Error fetching multiple subreddits', err);
+    console.error('❌ Unexpected error fetching multiple subreddits:', err);
     res.status(500).json({ error: 'Failed to fetch multiple subreddits' });
   }
 });

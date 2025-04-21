@@ -27,7 +27,7 @@ app.get('/reddit', async (req, res) => {
   // 🧪 If a specific subreddit is requested
   if (subreddit) {
     try {
-      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=hour&limit=100`, { headers });
+      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=day&limit=100`, { headers });
       const data = await response.json();
       return res.json(data);
     } catch (err) {
@@ -42,7 +42,7 @@ app.get('/reddit', async (req, res) => {
 
     await Promise.all(REDDIT_SUBS.map(async (sr) => {
       try {
-        const response = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=hour&limit=50`, { headers });
+        const response = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=day&limit=50`, { headers });
         const json = await response.json();
         results.push(...(json.data?.children || []));
         console.log(`✅ Fetched /r/${sr} (${(json.data?.children || []).length} posts)`);

@@ -86,6 +86,31 @@ app.get('/reddit/:sub', async (req, res) => {
   }
 });
 
+// 🔍 Custom Ticker Search
+app.get('/reddit/search', async (req, res) => {
+  const token = await getAccessToken();
+  const { q } = req.query;
+
+  if (!q || q.length > 6) {
+    return res.status(400).json({ error: 'Invalid ticker query' });
+  }
+
+  const url = `https://oauth.reddit.com/search.json?q=%24${q}&sort=top&limit=25&restrict_sr=false`;
+
+  try {
+    const r = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'kona-dashboard/1.0'
+      }
+    });
+    const json = await r.json();
+    res.json(json);
+  } catch (err) {
+    console.error(`❌ Reddit search failed:`, err);
+    res.status(500).json({ error: 'Reddit search failed' });
+  }
+});
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`🚀 Reddit OAuth proxy live on port ${port}`));
-

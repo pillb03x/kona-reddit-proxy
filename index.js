@@ -2,7 +2,12 @@ const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
 const app = express();
-app.use(cors());
+
+// Enable CORS for all origins explicitly
+app.use(cors({
+  origin: '*',
+  methods: ['GET']
+}));
 
 const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID;
 const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;

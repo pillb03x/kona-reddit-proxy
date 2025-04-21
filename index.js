@@ -16,30 +16,36 @@ const REDDIT_SUBS = [
   'WebullPennyStocks'
 ];
 
+// Helper to simulate browser headers
+const headers = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+};
+
 app.get('/reddit', async (req, res) => {
   const { subreddit } = req.query;
 
-  // Fetch specific subreddit
+  // 🧪 If a specific subreddit is requested
   if (subreddit) {
     try {
-      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=hour&limit=100`);
+      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=hour&limit=100`, { headers });
       const data = await response.json();
       return res.json(data);
     } catch (err) {
-      console.error('❌ Error fetching from:', subreddit, err);
-      return res.status(500).json({ error: `Failed to fetch subreddit ${subreddit}` });
+      console.error(`❌ Error fetching /r/${subreddit}:`, err.message);
+      return res.status(500).json({ error: `Failed to fetch subreddit /r/${subreddit}` });
     }
   }
 
-  // Fetch all subreddits in parallel with error tolerance
+  // 🌊 If no subreddit specified, fetch all from your list
   try {
     const results = [];
 
     await Promise.all(REDDIT_SUBS.map(async (sr) => {
       try {
-        const resSR = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=hour&limit=50`);
-        const json = await resSR.json();
+        const response = await fetch(`https://www.reddit.com/r/${sr}/top.json?t=hour&limit=50`, { headers });
+        const json = await response.json();
         results.push(...(json.data?.children || []));
+        console.log(`✅ Fetched /r/${sr} (${(json.data?.children || []).length} posts)`);
       } catch (err) {
         console.warn(`⚠️ Failed to fetch /r/${sr}:`, err.message);
       }
@@ -47,7 +53,7 @@ app.get('/reddit', async (req, res) => {
 
     res.json({ data: { children: results } });
   } catch (err) {
-    console.error('❌ Unexpected error fetching multiple subreddits:', err);
+    console.error('❌ Unexpected error fetching multiple subreddits:', err.message);
     res.status(500).json({ error: 'Failed to fetch multiple subreddits' });
   }
 });

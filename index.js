@@ -1,6 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit'); // Import rate-limiting
 const app = express();
 
 // Enable CORS for all origins explicitly
@@ -8,6 +9,16 @@ app.use(cors({
   origin: '*',
   methods: ['GET']
 }));
+
+// Rate-limiting middleware: limit 100 requests per 15 minutes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+// Apply rate-limiting to all routes
+app.use(limiter);
 
 const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID;
 const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
@@ -42,31 +53,53 @@ const REDDIT_SUBS = [
   'SqueezePlays', 'WebullPennyStocks'
 ];
 
-// 🧠 Multi-subreddit fetch
-app.get('/reddit', async (req, res) => {
+// 🧠 Fetch Data from Reddit for Multiple Subreddits with Delay Between Requests
+async function fetchRedditData(subreddit) {
   const token = await getAccessToken();
+  const url = `https://oauth.reddit.com/r/${subreddit}/top?t=day&limit=25`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'kona-dashboard/1.0'
+      }
+    });
+
+    const data = await response.json();
+    return data.data?.children || [];
+  } catch (err) {
+    console.error(`Error fetching ${subreddit}:`, err);
+    return [];
+  }
+}
+
+// 🧠 Multi-subreddit fetch with delays between requests
+async function fetchSubredditsData() {
   const results = [];
 
-  await Promise.all(REDDIT_SUBS.map(async sr => {
-    try {
-      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
-      const r = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'User-Agent': 'kona-dashboard/1.0'
-        }
-      });
-      const json = await r.json();
-      results.push(...(json.data?.children || []));
-    } catch (err) {
-      console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
-    }
-  }));
+  for (let i = 0; i < REDDIT_SUBS.length; i++) {
+    const subreddit = REDDIT_SUBS[i];
+    const data = await fetchRedditData(subreddit);
+    results.push(...data);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay between requests
+  }
 
-  res.json({ data: { children: results } });
+  return results;
+}
+
+// 🧠 Endpoint to fetch data from multiple subreddits
+app.get('/reddit', async (req, res) => {
+  try {
+    const results = await fetchSubredditsData();
+    res.json({ data: { children: results } });
+  } catch (err) {
+    console.error("Error fetching Reddit data:", err);
+    res.status(500).json({ error: 'Failed to fetch Reddit data' });
+  }
 });
 
-// 🧪 Single subreddit support
+// 🧪 Endpoint for a single subreddit
 app.get('/reddit/:sub', async (req, res) => {
   const token = await getAccessToken();
   const { sub } = req.params;
@@ -86,7 +119,7 @@ app.get('/reddit/:sub', async (req, res) => {
   }
 });
 
-// 🔍 Custom Ticker Search
+// 🔍 Custom Ticker Search Endpoint
 app.get('/reddit/search', async (req, res) => {
   const token = await getAccessToken();
   const { q } = req.query;

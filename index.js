@@ -114,16 +114,80 @@ app.get('/reddit/search', async (req, res) => {
   }
 });
 
-// 📈 Insider Trades - Pull from FinancialModelingPrep API (FMP)
+// 📈 Insider Trades - MOCK DATA for Development
 app.get('/api/insider-trades', async (req, res) => {
   try {
-    const { data } = await axios.get(`https://financialmodelingprep.com/api/v4/insider-trading?apikey=Tz3En0qEzQWPw4Ryvuw6y5tt4X7OPS1S`);
-    res.json(data);
+    const mockTrades = [
+      {
+        symbol: 'TSLA',
+        insiderName: 'Elon Musk',
+        transactionType: 'Buy',
+        shares: 10000,
+        sharePrice: 720.50,
+        filingDate: '2025-04-24',
+        link: 'https://www.sec.gov/Archives/edgar/data/0001318605/000089924325034567/xslF345X03/primary_doc.xml'
+      },
+      {
+        symbol: 'AAPL',
+        insiderName: 'Tim Cook',
+        transactionType: 'Sell',
+        shares: 5000,
+        sharePrice: 165.20,
+        filingDate: '2025-04-23',
+        link: 'https://www.sec.gov/Archives/edgar/data/0000320193/000119312525034567/xslF345X03/primary_doc.xml'
+      },
+      {
+        symbol: 'NVDA',
+        insiderName: 'Jensen Huang',
+        transactionType: 'Buy',
+        shares: 3000,
+        sharePrice: 650.75,
+        filingDate: '2025-04-22',
+        link: 'https://www.sec.gov/Archives/edgar/data/0001045810/000089924325034567/xslF345X03/primary_doc.xml'
+      },
+      {
+        symbol: 'AMZN',
+        insiderName: 'Andy Jassy',
+        transactionType: 'Buy',
+        shares: 4200,
+        sharePrice: 3200.00,
+        filingDate: '2025-04-21',
+        link: 'https://www.sec.gov/Archives/edgar/data/0001018724/000089924325034567/xslF345X03/primary_doc.xml'
+      },
+      {
+        symbol: 'MSFT',
+        insiderName: 'Satya Nadella',
+        transactionType: 'Sell',
+        shares: 6000,
+        sharePrice: 295.40,
+        filingDate: '2025-04-20',
+        link: 'https://www.sec.gov/Archives/edgar/data/0000789019/000089924325034567/xslF345X03/primary_doc.xml'
+      },
+      {
+        symbol: 'META',
+        insiderName: 'Mark Zuckerberg',
+        transactionType: 'Buy',
+        shares: 8000,
+        sharePrice: 270.15,
+        filingDate: '2025-04-19',
+        link: 'https://www.sec.gov/Archives/edgar/data/0001326801/000089924325034567/xslF345X03/primary_doc.xml'
+      },
+      {
+        symbol: 'GOOGL',
+        insiderName: 'Sundar Pichai',
+        transactionType: 'Sell',
+        shares: 4500,
+        sharePrice: 2800.00,
+        filingDate: '2025-04-18',
+        link: 'https://www.sec.gov/Archives/edgar/data/0001652044/000089924325034567/xslF345X03/primary_doc.xml'
+      }
+    ];
+    res.json(mockTrades);
   } catch (err) {
-    console.error('❌ Failed to fetch insider trades from FMP:', err.message);
-    res.status(500).json({ error: 'Failed to fetch insider trades' });
+    console.error('❌ Failed to fetch mock insider trades:', err.message);
+    res.status(500).json({ error: 'Failed to fetch mock insider trades' });
   }
 });
 
 const port = process.env.PORT || 10000;
-app.listen(port, () => console.log(`🚀 OnlyScans Server Live — Reddit & Insider API running on port ${port}`));
+app.listen(port, () => console.log(`🚀 OnlyScans Server Live — Reddit & Insider MOCK API running on port ${port}`));

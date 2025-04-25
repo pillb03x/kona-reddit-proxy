@@ -1,9 +1,9 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
-const app = express();
 const axios = require('axios');
 const xml2js = require('xml2js');
+const app = express();
 
 // Enable CORS for all origins explicitly
 app.use(cors({
@@ -114,5 +114,34 @@ app.get('/reddit/search', async (req, res) => {
   }
 });
 
+// 📈 Insider Trades - Pull Form 4 filings from SEC
+app.get('/api/insider-trades', async (req, res) => {
+  try {
+    const { data } = await axios.get('https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent', {
+      headers: {
+        'User-Agent': 'kona-dashboard/1.0 (your-email@example.com)' // SEC requires a real user-agent
+      }
+    });
+
+    const parsed = await xml2js.parseStringPromise(data);
+    const entries = parsed.rss.channel[0].item || [];
+
+    // Filter only Form 4 (insider trading) entries
+    const form4s = entries.filter(entry => entry.category?.[0]._ === '4');
+
+    // Map to simplified clean output
+    const insiderTrades = form4s.map(filing => ({
+      title: filing.title?.[0] || '',
+      link: filing.link?.[0] || '',
+      pubDate: filing.pubDate?.[0] || ''
+    }));
+
+    res.json(insiderTrades);
+  } catch (err) {
+    console.error('❌ Failed to fetch SEC insider trades:', err.message);
+    res.status(500).json({ error: 'Failed to fetch insider trades' });
+  }
+});
+
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🚀 Reddit OAuth proxy live on port ${port}`));
+app.listen(port, () => console.log(`🚀 KONA Dashboard Server Live — Reddit & Insider API running on port ${port}`));

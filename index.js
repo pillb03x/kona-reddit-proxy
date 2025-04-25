@@ -1,6 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');  // Import rate-limit
 const app = express();
 
 // Enable CORS for all origins explicitly
@@ -8,6 +9,16 @@ app.use(cors({
   origin: '*',
   methods: ['GET']
 }));
+
+// Rate-limiting middleware: limit 100 requests per 15 minutes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+// Apply rate-limiting to all routes
+app.use(limiter);
 
 const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID;
 const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;

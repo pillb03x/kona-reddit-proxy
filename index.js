@@ -40,8 +40,7 @@ async function getAccessToken() {
 
 const REDDIT_SUBS = [
   'pennystocks', 'RobinHoodPennyStocks', 'Shortsqueeze',
-  'smallstreetbets', 'SPACs', 'Spacstocks',
-  'SqueezePlays', 'WebullPennyStocks'
+  'smallstreetbets', 'SPACs', 'Spacstocks', 'SqueezePlays', 'WebullPennyStocks'
 ];
 
 // 🧠 Multi-subreddit fetch
@@ -55,31 +54,44 @@ app.get('/reddit', async (req, res) => {
       const r = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'User-Agent': 'kona-dashboard/1.0'
+          'User-Agent': 'OnlyScans SEC Monitor (nightra8er@gmail.com)'
         }
       });
+
+      if (!r.ok) {
+        console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
+        return; // Skip this subreddit but continue
+      }
+
       const json = await r.json();
       results.push(...(json.data?.children || []));
     } catch (err) {
-      console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
+      console.error(`⚠️ Error fetching /r/${sr}: ${err.message}`);
     }
   }));
 
   res.json({ data: { children: results } });
 });
 
-// 🧪 Single subreddit fetch
+// 🧪 Single subreddit fetch (Safe version!)
 app.get('/reddit/:sub', async (req, res) => {
   const token = await getAccessToken();
   const { sub } = req.params;
+
   try {
     const url = `https://oauth.reddit.com/r/${sub}/top?t=day&limit=25`;
     const r = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'kona-dashboard/1.0'
+        'User-Agent': 'OnlyScans SEC Monitor (nightra8er@gmail.com)'
       }
     });
+
+    if (!r.ok) {
+      console.error(`❌ Reddit API error for /r/${sub}: ${r.status}`);
+      return res.status(r.status).json({ error: `Reddit API error: ${r.status}` });
+    }
+
     const json = await r.json();
     res.json(json);
   } catch (err) {
@@ -103,9 +115,15 @@ app.get('/reddit/search', async (req, res) => {
     const r = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'kona-dashboard/1.0'
+        'User-Agent': 'OnlyScans SEC Monitor (nightra8er@gmail.com)'
       }
     });
+
+    if (!r.ok) {
+      console.error(`❌ Reddit search API error: ${r.status}`);
+      return res.status(r.status).json({ error: `Reddit API error: ${r.status}` });
+    }
+
     const json = await r.json();
     res.json(json);
   } catch (err) {
@@ -114,7 +132,7 @@ app.get('/reddit/search', async (req, res) => {
   }
 });
 
-// 📈 Insider Trades - MOCK DATA for Development
+// 📈 Insider Trades - MOCK DATA
 app.get('/api/insider-trades', async (req, res) => {
   try {
     const mockTrades = [

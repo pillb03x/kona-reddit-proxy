@@ -1,7 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');  // Import rate-limit
+const rateLimit = require('express-rate-limit');
 const app = express();
 
 // Enable CORS for all origins explicitly
@@ -58,23 +58,27 @@ app.get('/reddit', async (req, res) => {
   const token = await getAccessToken();
   const results = [];
 
-  await Promise.all(REDDIT_SUBS.map(async sr => {
-    try {
-      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
-      const r = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'User-Agent': 'kona-dashboard/1.0'
-        }
-      });
-      const json = await r.json();
-      results.push(...(json.data?.children || []));
-    } catch (err) {
-      console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
-    }
-  }));
-
-  res.json({ data: { children: results } });
+  try {
+    await Promise.all(REDDIT_SUBS.map(async sr => {
+      try {
+        const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
+        const r = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'kona-dashboard/1.0'
+          }
+        });
+        const json = await r.json();
+        results.push(...(json.data?.children || []));
+      } catch (err) {
+        console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
+      }
+    }));
+    res.json({ data: { children: results } });
+  } catch (err) {
+    console.error('❌ Error fetching multiple subreddits:', err);
+    res.status(500).json({ error: 'Failed to fetch data from multiple subreddits' });
+  }
 });
 
 // 🧪 Single subreddit support
@@ -125,3 +129,4 @@ app.get('/reddit/search', async (req, res) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`🚀 Reddit OAuth proxy live on port ${port}`));
+

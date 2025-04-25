@@ -1,7 +1,6 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 const app = express();
 
 // Enable CORS for all origins explicitly
@@ -9,16 +8,6 @@ app.use(cors({
   origin: '*',
   methods: ['GET']
 }));
-
-// Rate-limiting middleware: limit 100 requests per 15 minutes
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-
-// Apply rate-limiting to all routes
-app.use(limiter);
 
 const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID;
 const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
@@ -58,27 +47,23 @@ app.get('/reddit', async (req, res) => {
   const token = await getAccessToken();
   const results = [];
 
-  try {
-    await Promise.all(REDDIT_SUBS.map(async sr => {
-      try {
-        const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
-        const r = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'User-Agent': 'kona-dashboard/1.0'
-          }
-        });
-        const json = await r.json();
-        results.push(...(json.data?.children || []));
-      } catch (err) {
-        console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
-      }
-    }));
-    res.json({ data: { children: results } });
-  } catch (err) {
-    console.error('❌ Error fetching multiple subreddits:', err);
-    res.status(500).json({ error: 'Failed to fetch data from multiple subreddits' });
-  }
+  await Promise.all(REDDIT_SUBS.map(async sr => {
+    try {
+      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
+      const r = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'kona-dashboard/1.0'
+        }
+      });
+      const json = await r.json();
+      results.push(...(json.data?.children || []));
+    } catch (err) {
+      console.error(`⚠️ Failed to fetch /r/${sr}: ${err.message}`);
+    }
+  }));
+
+  res.json({ data: { children: results } });
 });
 
 // 🧪 Single subreddit support
@@ -129,4 +114,3 @@ app.get('/reddit/search', async (req, res) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`🚀 Reddit OAuth proxy live on port ${port}`));
-

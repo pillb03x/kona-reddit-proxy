@@ -119,17 +119,15 @@ app.get('/api/insider-trades', async (req, res) => {
   try {
     const { data } = await axios.get('https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent', {
       headers: {
-        'User-Agent': 'kona-dashboard/1.0 (your-email@example.com)' // SEC requires a real user-agent
+        'User-Agent': 'OnlyScans SEC Monitor/1.0 (nightra8er@gmail.com)' // ✅ NEW User-Agent!
       }
     });
 
     const parsed = await xml2js.parseStringPromise(data);
     const entries = parsed.rss.channel[0].item || [];
 
-    // Filter only Form 4 (insider trading) entries
     const form4s = entries.filter(entry => entry.category?.[0]._ === '4');
 
-    // Map to simplified clean output
     const insiderTrades = form4s.map(filing => ({
       title: filing.title?.[0] || '',
       link: filing.link?.[0] || '',
@@ -143,5 +141,5 @@ app.get('/api/insider-trades', async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🚀 KONA Dashboard Server Live — Reddit & Insider API running on port ${port}`));
+const port = process.env.PORT || 10000;
+app.listen(port, () => console.log(`🚀 OnlyScans Server Live — Reddit & Insider API running on port ${port}`));

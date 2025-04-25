@@ -17,7 +17,7 @@ const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
 let accessToken = null;
 let tokenExpiry = 0;
 
-// 🔐 Get OAuth2 Token
+// 🔐 Get OAuth2 Token for Reddit
 async function getAccessToken() {
   const now = Date.now();
   if (accessToken && now < tokenExpiry) return accessToken;
@@ -68,7 +68,7 @@ app.get('/reddit', async (req, res) => {
   res.json({ data: { children: results } });
 });
 
-// 🧪 Single subreddit support
+// 🧪 Single subreddit fetch
 app.get('/reddit/:sub', async (req, res) => {
   const token = await getAccessToken();
   const { sub } = req.params;
@@ -114,29 +114,13 @@ app.get('/reddit/search', async (req, res) => {
   }
 });
 
-// 📈 Insider Trades - Pull Form 4 filings from SEC
+// 📈 Insider Trades - Pull from FinancialModelingPrep API (FMP)
 app.get('/api/insider-trades', async (req, res) => {
   try {
-    const { data } = await axios.get('https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent', {
-      headers: {
-        'User-Agent': 'OnlyScans SEC Monitor/1.0 (nightra8er@gmail.com)' // ✅ NEW User-Agent!
-      }
-    });
-
-    const parsed = await xml2js.parseStringPromise(data);
-    const entries = parsed.rss.channel[0].item || [];
-
-    const form4s = entries.filter(entry => entry.category?.[0]._ === '4');
-
-    const insiderTrades = form4s.map(filing => ({
-      title: filing.title?.[0] || '',
-      link: filing.link?.[0] || '',
-      pubDate: filing.pubDate?.[0] || ''
-    }));
-
-    res.json(insiderTrades);
+    const { data } = await axios.get(`https://financialmodelingprep.com/api/v4/insider-trading?apikey=Tz3En0qEzQWPw4Ryvuw6y5tt4X7OPS1S`);
+    res.json(data);
   } catch (err) {
-    console.error('❌ Failed to fetch SEC insider trades:', err.message);
+    console.error('❌ Failed to fetch insider trades from FMP:', err.message);
     res.status(500).json({ error: 'Failed to fetch insider trades' });
   }
 });

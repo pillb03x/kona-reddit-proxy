@@ -1,16 +1,18 @@
+// server.js - OnlyScans Reddit Proxy (Upgraded Version)
+
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
-const axios = require('axios');
-const xml2js = require('xml2js');
+
 const app = express();
 
-// Enable CORS for all origins explicitly
+// Enable CORS for all origins
 app.use(cors({
   origin: '*',
   methods: ['GET']
 }));
 
+// 🔐 Reddit API credentials
 const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID;
 const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
 
@@ -22,60 +24,78 @@ async function getAccessToken() {
   const now = Date.now();
   if (accessToken && now < tokenExpiry) return accessToken;
 
-  const creds = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64');
-  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: 'grant_type=client_credentials'
-  });
+  try {
+    const creds = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64');
+    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${creds}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'grant_type=client_credentials'
+    });
 
-  const data = await res.json();
-  accessToken = data.access_token;
-  tokenExpiry = now + (data.expires_in * 1000) - 60000; // refresh 1 min early
-  return accessToken;
+    if (!res.ok) {
+      console.error('❌ Failed to refresh Reddit token:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    accessToken = data.access_token;
+    tokenExpiry = now + (data.expires_in * 1000) - 120000; // refresh 2 min early
+    console.log('✅ Reddit token refreshed');
+    return accessToken;
+  } catch (err) {
+    console.error('❌ Error refreshing Reddit token:', err.message);
+    return null;
+  }
 }
 
+// Subreddits to monitor
 const REDDIT_SUBS = [
   'pennystocks', 'RobinHoodPennyStocks', 'Shortsqueeze',
   'smallstreetbets', 'SPACs', 'Spacstocks', 'SqueezePlays', 'WebullPennyStocks'
 ];
 
 // 🧠 Multi-subreddit fetch
-app.get('/reddit', async (req, res) => {
+app.get('/reddit/trending', async (req, res) => {
   const token = await getAccessToken();
+  if (!token) return res.status(500).json({ error: 'Reddit token unavailable' });
+
   const results = [];
 
-  await Promise.all(REDDIT_SUBS.map(async sr => {
-    try {
-      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
-      const r = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'User-Agent': 'OnlyScans SEC Monitor (nightra8er@gmail.com)'
+  await Promise.all(
+    REDDIT_SUBS.map(async (sr) => {
+      try {
+        const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
+        const r = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
+          }
+        });
+
+        if (!r.ok) {
+          console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
+          return;
         }
-      });
 
-      if (!r.ok) {
-        console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
-        return; // Skip this subreddit but continue
+        const json = await r.json();
+        results.push(...(json.data?.children || []));
+      } catch (err) {
+        console.error(`⚠️ Error fetching /r/${sr}:`, err.message);
       }
-
-      const json = await r.json();
-      results.push(...(json.data?.children || []));
-    } catch (err) {
-      console.error(`⚠️ Error fetching /r/${sr}: ${err.message}`);
-    }
-  }));
+    })
+  );
 
   res.json({ data: { children: results } });
 });
 
-// 🧪 Single subreddit fetch (Safe version!)
+// 🔍 Single subreddit fetch
 app.get('/reddit/:sub', async (req, res) => {
   const token = await getAccessToken();
+  if (!token) return res.status(500).json({ error: 'Reddit token unavailable' });
+
   const { sub } = req.params;
 
   try {
@@ -83,7 +103,7 @@ app.get('/reddit/:sub', async (req, res) => {
     const r = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'OnlyScans SEC Monitor (nightra8er@gmail.com)'
+        'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
       }
     });
 
@@ -95,7 +115,7 @@ app.get('/reddit/:sub', async (req, res) => {
     const json = await r.json();
     res.json(json);
   } catch (err) {
-    console.error(`❌ Error fetching /r/${sub}: ${err.message}`);
+    console.error(`❌ Error fetching /r/${sub}:`, err.message);
     res.status(500).json({ error: `Failed to fetch /r/${sub}` });
   }
 });
@@ -103,19 +123,19 @@ app.get('/reddit/:sub', async (req, res) => {
 // 🔍 Custom Ticker Search
 app.get('/reddit/search', async (req, res) => {
   const token = await getAccessToken();
-  const { q } = req.query;
+  if (!token) return res.status(500).json({ error: 'Reddit token unavailable' });
 
+  const { q } = req.query;
   if (!q || q.length > 6) {
     return res.status(400).json({ error: 'Invalid ticker query' });
   }
 
-  const url = `https://oauth.reddit.com/search.json?q=%24${q}&sort=top&limit=25&restrict_sr=false`;
-
   try {
+    const url = `https://oauth.reddit.com/search.json?q=%24${encodeURIComponent(q)}&sort=top&limit=25&restrict_sr=false`;
     const r = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'OnlyScans SEC Monitor (nightra8er@gmail.com)'
+        'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
       }
     });
 
@@ -127,7 +147,7 @@ app.get('/reddit/search', async (req, res) => {
     const json = await r.json();
     res.json(json);
   } catch (err) {
-    console.error(`❌ Reddit search failed:`, err);
+    console.error('❌ Reddit search failed:', err.message);
     res.status(500).json({ error: 'Reddit search failed' });
   }
 });
@@ -207,5 +227,8 @@ app.get('/api/insider-trades', async (req, res) => {
   }
 });
 
+// Start server
 const port = process.env.PORT || 10000;
-app.listen(port, () => console.log(`🚀 OnlyScans Server Live — Reddit & Insider MOCK API running on port ${port}`));
+app.listen(port, () => {
+  console.log(`🚀 OnlyScans Server Live — Reddit Proxy + Insider API running on port ${port}`);
+});

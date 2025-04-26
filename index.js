@@ -51,10 +51,9 @@ async function getAccessToken() {
   }
 }
 
-// Subreddits to monitor
+// Subreddits to monitor (updated)
 const REDDIT_SUBS = [
-  'pennystocks', 'RobinHoodPennyStocks', 'Shortsqueeze',
-  'smallstreetbets', 'SPACs', 'Spacstocks', 'SqueezePlays', 'WebullPennyStocks'
+  'pennystocks', 'Shortsqueeze', 'RobinHoodPennyStocks', 'SqueezePlays'
 ];
 
 // 🧠 Multi-subreddit fetch
@@ -182,42 +181,6 @@ app.get('/api/insider-trades', async (req, res) => {
         sharePrice: 650.75,
         filingDate: '2025-04-22',
         link: 'https://www.sec.gov/Archives/edgar/data/0001045810/000089924325034567/xslF345X03/primary_doc.xml'
-      },
-      {
-        symbol: 'AMZN',
-        insiderName: 'Andy Jassy',
-        transactionType: 'Buy',
-        shares: 4200,
-        sharePrice: 3200.00,
-        filingDate: '2025-04-21',
-        link: 'https://www.sec.gov/Archives/edgar/data/0001018724/000089924325034567/xslF345X03/primary_doc.xml'
-      },
-      {
-        symbol: 'MSFT',
-        insiderName: 'Satya Nadella',
-        transactionType: 'Sell',
-        shares: 6000,
-        sharePrice: 295.40,
-        filingDate: '2025-04-20',
-        link: 'https://www.sec.gov/Archives/edgar/data/0000789019/000089924325034567/xslF345X03/primary_doc.xml'
-      },
-      {
-        symbol: 'META',
-        insiderName: 'Mark Zuckerberg',
-        transactionType: 'Buy',
-        shares: 8000,
-        sharePrice: 270.15,
-        filingDate: '2025-04-19',
-        link: 'https://www.sec.gov/Archives/edgar/data/0001326801/000089924325034567/xslF345X03/primary_doc.xml'
-      },
-      {
-        symbol: 'GOOGL',
-        insiderName: 'Sundar Pichai',
-        transactionType: 'Sell',
-        shares: 4500,
-        sharePrice: 2800.00,
-        filingDate: '2025-04-18',
-        link: 'https://www.sec.gov/Archives/edgar/data/0001652044/000089924325034567/xslF345X03/primary_doc.xml'
       }
     ];
     res.json(mockTrades);

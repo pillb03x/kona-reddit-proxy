@@ -1,4 +1,4 @@
-// server.js - OnlyScans Reddit Proxy (Updated + Fixed Version)
+// server.js - OnlyScans Reddit Proxy (Upgraded Version)
 
 const express = require('express');
 const fetch = require('node-fetch');
@@ -6,7 +6,7 @@ const cors = require('cors');
 
 const app = express();
 
-// Enable CORS for all origins
+// Enable CORS
 app.use(cors({
   origin: '*',
   methods: ['GET']
@@ -19,7 +19,7 @@ const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
 let accessToken = null;
 let tokenExpiry = 0;
 
-// 🔐 Get OAuth2 Token for Reddit
+// 🔐 Get OAuth2 Token
 async function getAccessToken() {
   const now = Date.now();
   if (accessToken && now < tokenExpiry) return accessToken;
@@ -42,7 +42,7 @@ async function getAccessToken() {
 
     const data = await res.json();
     accessToken = data.access_token;
-    tokenExpiry = now + (data.expires_in * 1000) - 120000; // refresh 2 min early
+    tokenExpiry = now + (data.expires_in * 1000) - 120000; // 2 mins early
     console.log('✅ Reddit token refreshed');
     return accessToken;
   } catch (err) {
@@ -51,41 +51,57 @@ async function getAccessToken() {
   }
 }
 
-// Subreddits to monitor (cleaned list)
+// 🌟 Helper: Safe Reddit fetch with retry on 429
+async function safeFetch(url, options, retries = 1) {
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 429 && retries > 0) {
+      console.warn(`⏳ 429 received, retrying after short wait... (${url})`);
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 sec
+      return safeFetch(url, options, retries - 1);
+    }
+    return res;
+  } catch (err) {
+    console.error('❌ Fetch error:', err.message);
+    throw err;
+  }
+}
+
+// Subreddits to monitor
 const REDDIT_SUBS = [
-  'pennystocks',
-  'Shortsqueeze',
-  'SqueezePlays'
+  'pennystocks', 'Shortsqueeze', 'SqueezePlays'
 ];
 
-// 🧠 Multi-subreddit fetch (Serial to avoid rate limits)
+// 🧠 Multi-subreddit fetch
 app.get('/reddit/trending', async (req, res) => {
   const token = await getAccessToken();
   if (!token) return res.status(500).json({ error: 'Reddit token unavailable' });
 
   const results = [];
 
-  for (const sr of REDDIT_SUBS) {
-    try {
-      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
-      const r = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
+  await Promise.all(
+    REDDIT_SUBS.map(async (sr) => {
+      try {
+        const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
+        const r = await safeFetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
+          }
+        });
+
+        if (!r.ok) {
+          console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
+          return;
         }
-      });
 
-      if (!r.ok) {
-        console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
-        continue;
+        const json = await r.json();
+        results.push(...(json.data?.children || []));
+      } catch (err) {
+        console.error(`⚠️ Error fetching /r/${sr}:`, err.message);
       }
-
-      const json = await r.json();
-      results.push(...(json.data?.children || []));
-    } catch (err) {
-      console.error(`⚠️ Error fetching /r/${sr}:`, err.message);
-    }
-  }
+    })
+  );
 
   res.json({ data: { children: results } });
 });
@@ -99,7 +115,7 @@ app.get('/reddit/:sub', async (req, res) => {
 
   try {
     const url = `https://oauth.reddit.com/r/${sub}/top?t=day&limit=25`;
-    const r = await fetch(url, {
+    const r = await safeFetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
@@ -131,7 +147,7 @@ app.get('/reddit/search', async (req, res) => {
 
   try {
     const url = `https://oauth.reddit.com/search.json?q=%24${encodeURIComponent(q)}&sort=top&limit=25&restrict_sr=false`;
-    const r = await fetch(url, {
+    const r = await safeFetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
@@ -195,4 +211,3 @@ const port = process.env.PORT || 10000;
 app.listen(port, () => {
   console.log(`🚀 OnlyScans Server Live — Reddit Proxy + Insider API running on port ${port}`);
 });
-

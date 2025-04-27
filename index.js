@@ -42,7 +42,7 @@ async function getAccessToken() {
 
     const data = await res.json();
     accessToken = data.access_token;
-    tokenExpiry = now + (data.expires_in * 1000) - 120000; // 2 mins early
+    tokenExpiry = now + (data.expires_in * 1000) - 120000; // Refresh 2 mins early
     console.log('✅ Reddit token refreshed');
     return accessToken;
   } catch (err) {
@@ -57,7 +57,7 @@ async function safeFetch(url, options, retries = 1) {
     const res = await fetch(url, options);
     if (res.status === 429 && retries > 0) {
       console.warn(`⏳ 429 received, retrying after short wait... (${url})`);
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 sec
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
       return safeFetch(url, options, retries - 1);
     }
     return res;
@@ -67,20 +67,23 @@ async function safeFetch(url, options, retries = 1) {
   }
 }
 
-// Subreddits to monitor
+// Subreddits to monitor by default
 const REDDIT_SUBS = [
   'pennystocks', 'Shortsqueeze', 'SqueezePlays'
 ];
 
-// 🧠 Multi-subreddit fetch
+// 🧠 Multi-subreddit fetch (dynamic sub list)
 app.get('/reddit/trending', async (req, res) => {
   const token = await getAccessToken();
   if (!token) return res.status(500).json({ error: 'Reddit token unavailable' });
 
+  // ✨ Use subs from query param if provided, otherwise fallback
+  const subs = req.query.subs ? req.query.subs.split(',') : REDDIT_SUBS;
+
   const results = [];
 
   await Promise.all(
-    REDDIT_SUBS.map(async (sr) => {
+    subs.map(async (sr) => {
       try {
         const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
         const r = await safeFetch(url, {

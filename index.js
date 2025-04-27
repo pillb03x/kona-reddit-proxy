@@ -1,4 +1,4 @@
-// server.js - OnlyScans Reddit Proxy (Upgraded Version)
+// server.js - OnlyScans Reddit Proxy (Updated + Fixed Version)
 
 const express = require('express');
 const fetch = require('node-fetch');
@@ -51,41 +51,41 @@ async function getAccessToken() {
   }
 }
 
-// Subreddits to monitor (updated)
+// Subreddits to monitor (cleaned list)
 const REDDIT_SUBS = [
-  'pennystocks', 'Shortsqueeze', 'RobinHoodPennyStocks', 'SqueezePlays'
+  'pennystocks',
+  'Shortsqueeze',
+  'SqueezePlays'
 ];
 
-// 🧠 Multi-subreddit fetch
+// 🧠 Multi-subreddit fetch (Serial to avoid rate limits)
 app.get('/reddit/trending', async (req, res) => {
   const token = await getAccessToken();
   if (!token) return res.status(500).json({ error: 'Reddit token unavailable' });
 
   const results = [];
 
-  await Promise.all(
-    REDDIT_SUBS.map(async (sr) => {
-      try {
-        const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
-        const r = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
-          }
-        });
-
-        if (!r.ok) {
-          console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
-          return;
+  for (const sr of REDDIT_SUBS) {
+    try {
+      const url = `https://oauth.reddit.com/r/${sr}/top?t=day&limit=25`;
+      const r = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'OnlyScans SEC Monitor (support@onlyscans.com)'
         }
+      });
 
-        const json = await r.json();
-        results.push(...(json.data?.children || []));
-      } catch (err) {
-        console.error(`⚠️ Error fetching /r/${sr}:`, err.message);
+      if (!r.ok) {
+        console.error(`⚠️ Failed subreddit fetch /r/${sr}: HTTP ${r.status}`);
+        continue;
       }
-    })
-  );
+
+      const json = await r.json();
+      results.push(...(json.data?.children || []));
+    } catch (err) {
+      console.error(`⚠️ Error fetching /r/${sr}:`, err.message);
+    }
+  }
 
   res.json({ data: { children: results } });
 });
@@ -190,8 +190,9 @@ app.get('/api/insider-trades', async (req, res) => {
   }
 });
 
-// Start server
+// 🚀 Start server
 const port = process.env.PORT || 10000;
 app.listen(port, () => {
   console.log(`🚀 OnlyScans Server Live — Reddit Proxy + Insider API running on port ${port}`);
 });
+
